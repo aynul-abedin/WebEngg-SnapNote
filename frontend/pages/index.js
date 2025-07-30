@@ -64,10 +64,16 @@ export default function Home() {
                   : note.content
                 }
               </p>
-              <div className="flex justify-between items-center text-sm text-gray-500">
+              <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
                 <span>By {note.authorName}</span>
                 <span>{formatDate(note.createdAt)}</span>
               </div>
+              <Link 
+                href={`/view/${note._id}`}
+                className="block w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 text-center"
+              >
+                View Full Note
+              </Link>
             </div>
           ))}
         </div>

@@ -160,6 +160,42 @@ app.get('/api/notes', async (req, res) => {
   }
 });
 
+// Get single note
+app.get('/api/notes/:id', async (req, res) => {
+  try {
+    const note = await Note.findById(req.params.id);
+    
+    if (!note) {
+      return res.status(404).json({ message: 'Note not found' });
+    }
+
+    // If note is private, check if user is authenticated and is the author
+    if (!note.isPublic) {
+      // Check for auth header
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+
+      if (!token) {
+        return res.status(401).json({ message: 'Access denied' });
+      }
+
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (note.author.toString() !== decoded.userId) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      } catch (err) {
+        return res.status(403).json({ message: 'Invalid token' });
+      }
+    }
+
+    res.json(note);
+  } catch (error) {
+    console.error('Get note error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Create note
 app.post('/api/notes', authenticateToken, async (req, res) => {
   try {
@@ -194,6 +230,25 @@ app.get('/api/my-notes', authenticateToken, async (req, res) => {
   }
 });
 
+// Get single note
+app.get('/api/notes/:id', authenticateToken, async (req, res) => {
+  try {
+    const note = await Note.findOne({
+      _id: req.params.id,
+      author: req.user.userId
+    });
+
+    if (!note) {
+      return res.status(404).json({ message: 'Note not found' });
+    }
+
+    res.json(note);
+  } catch (error) {
+    console.error('Get note error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Delete note
 app.delete('/api/notes/:id', authenticateToken, async (req, res) => {
   try {
@@ -212,6 +267,25 @@ app.delete('/api/notes/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// Update note
+app.put('/api/notes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { title, content, isPublic } = req.body;
+    const note = await Note.findOneAndUpdate(
+      { _id: req.params.id, author: req.user.userId },
+      { title, content, isPublic, updatedAt: new Date() },
+      { new: true }
+    );
+    if (!note) {
+      return res.status(404).json({ message: 'Note not found' });
+    }
+    res.json(note);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
