@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -17,11 +19,29 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected successfully'))
   .catch(err => console.error('MongoDB connection error:', err));
 
+// Configure multer for file upload
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not an image! Please upload an image.'), false);
+    }
+  }
+});
+
 // User Schema
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true }
+  password: { type: String, required: true },
+  avatar: { type: String, default: '' } // URL or base64 of the avatar image
 }, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);
@@ -56,6 +76,36 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Routes
+
+// Upload avatar
+app.post('/api/upload-avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Convert the buffer to base64
+    const base64Image = req.file.buffer.toString('base64');
+    const avatarUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+    
+    // Update user's avatar
+    user.avatar = avatarUrl;
+    await user.save();
+
+    res.json({ 
+      message: 'Avatar uploaded successfully',
+      avatarUrl: avatarUrl
+    });
+  } catch (error) {
+    console.error('Avatar upload error:', error);
+    res.status(500).json({ message: 'Failed to upload avatar: ' + error.message });
+  }
+});
 
 // Register
 app.post('/api/register', async (req, res) => {
@@ -108,6 +158,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // Login
+
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -151,9 +202,17 @@ app.get('/api/notes', async (req, res) => {
   try {
     const notes = await Note.find({ isPublic: true })
       .sort({ createdAt: -1 })
-      .populate('author', 'username');
+      .populate({
+        path: 'author',
+        select: '_id username avatar'  // Include _id in the selected fields
+      });
     
-    res.json(notes);
+    const notesWithAuthorInfo = notes.map(note => ({
+      ...note.toObject(),
+      authorName: note.author?.username || note.authorName  // Use author username if available
+    }));
+    
+    res.json(notesWithAuthorInfo);
   } catch (error) {
     console.error('Get notes error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -217,11 +276,85 @@ app.post('/api/notes', authenticateToken, async (req, res) => {
   }
 });
 
+// Get user profile
+app.get('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update user profile
+app.put('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const { username, email, currentPassword, newPassword, avatar } = req.body;
+
+    // Check if email is taken by another user
+    const emailExists = await User.findOne({ 
+      email, 
+      _id: { $ne: req.user.userId } 
+    });
+    if (emailExists) {
+      return res.status(400).json({ message: 'Email is already taken' });
+    }
+
+    // Check if username is taken by another user
+    const usernameExists = await User.findOne({ 
+      username, 
+      _id: { $ne: req.user.userId } 
+    });
+    if (usernameExists) {
+      return res.status(400).json({ message: 'Username is already taken' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // If changing password, verify current password
+    if (currentPassword && newPassword) {
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    user.username = username;
+    user.email = email;
+    if (avatar) {
+      user.avatar = avatar;
+    }
+    await user.save();
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get user's notes
 app.get('/api/my-notes', authenticateToken, async (req, res) => {
   try {
     const notes = await Note.find({ author: req.user.userId })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .populate('author', 'username avatar');
     
     res.json(notes);
   } catch (error) {
@@ -286,6 +419,41 @@ app.put('/api/notes/:id', authenticateToken, async (req, res) => {
   }
 });
 
+
+// Get user profile by ID
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select('-password -email') // Exclude sensitive information
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error('Get user profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get user's public notes
+app.get('/api/users/:id/notes', async (req, res) => {
+  try {
+    const notes = await Note.find({
+      author: req.params.id,
+      isPublic: true
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+    res.json(notes);
+  } catch (error) {
+    console.error('Get user notes error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
