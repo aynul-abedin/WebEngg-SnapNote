@@ -24,7 +24,6 @@ SnapNote is a full-stack web application that allows users to create, manage, an
 - **MongoDB** - Database (with Mongoose ODM)
 - **JWT** - Authentication middleware
 - **Bcrypt** - Password hashing
-- **Multer** - File upload handling
 
 ## Getting Started
 
