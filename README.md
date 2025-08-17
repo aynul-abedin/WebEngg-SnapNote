@@ -36,7 +36,7 @@ SnapNote is a full-stack web application that allows users to create, manage, an
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/Murshed001/WebEngg-SnapNote.git
+git clone git@github.com:aynul-abedin/WebEngg-SnapNote.git
 cd WebEngg-SnapNote
 ```
 
