@@ -22,11 +22,12 @@ export default function CreateNote() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Redirect if not authenticated
-  if (!user) {
-    router.push('/login');
-    return null;
-  }
+  useEffect(() => {
+    // Redirect if not authenticated
+    if (!user) {
+      router.push('/login');
+    }
+  }, [user, router]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -388,4 +389,11 @@ Pro tip: Start with an engaging opening line to hook your readers!"
       </div>
     </div>
   );
+}
+
+// Add server-side protection
+export async function getServerSideProps(context) {
+  return {
+    props: {} // Will be passed to the page component as props
+  }
 }

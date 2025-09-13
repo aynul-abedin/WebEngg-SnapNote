@@ -27,9 +27,9 @@ export default function Profile() {
   useEffect(() => {
     if (!user) {
       router.push('/login');
-    } else {
-      fetchProfile();
+      return;
     }
+    fetchProfile();
   }, [user, router]);
 
   const fetchProfile = async () => {
