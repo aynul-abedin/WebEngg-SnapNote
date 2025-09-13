@@ -47,11 +47,20 @@ npm install
 ```
 
 3. Configure Environment Variables:
-Create a `.env` file in the backend directory with:
+
+Backend (.env):
 ```env
 PORT=5000
 MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret
+CORS_ORIGIN=http://localhost:3000  # For development
+UPLOADS_DIR=./uploads
+```
+
+Frontend (.env):
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000  # For development
+# Use https://snapnote-backend-oypz.onrender.com for production
 ```
 
 4. Install Frontend Dependencies:
@@ -62,19 +71,33 @@ npm install
 
 5. Run the Application:
 
-Backend (from backend directory):
+Development Mode:
 ```bash
+# Backend (from backend directory)
+npm run dev
+
+# Frontend (from frontend directory)
 npm run dev
 ```
 
-Frontend (from frontend directory):
+Production Mode:
 ```bash
-npm run dev
+# Backend
+npm run build
+npm start
+
+# Frontend
+npm run build
+npm start
 ```
 
-The application will be available at:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5000
+Access Points:
+- Development:
+  - Frontend: http://localhost:3000
+  - Backend API: http://localhost:5000
+- Production:
+  - Frontend: Your deployed URL
+  - Backend API: https://snapnote-backend-oypz.onrender.com
 
 ## Project Structure
 

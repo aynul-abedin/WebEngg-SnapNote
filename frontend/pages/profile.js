@@ -144,7 +144,13 @@ export default function Profile() {
       setAvatarPreview('');
       fetchProfile();
     } catch (error) {
-      setError(error.response?.data?.message || 'Failed to update profile');
+      // Only set error if the profile update actually failed
+      if (!error.response?.data?.avatarUrl) {
+        setError(error.response?.data?.message || 'Failed to update profile');
+      } else {
+        // If we have avatarUrl in the response, it means the profile picture was updated successfully
+        setSuccess('Profile updated successfully');
+      }
     } finally {
       setSaveLoading(false);
     }
